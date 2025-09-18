@@ -1,1 +1,1 @@
-# esp32-voice-translator
+# voice-translator
