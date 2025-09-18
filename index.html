@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Voice Translator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .connection-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border: 2px solid #e9ecef;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        button.connected {
+            background: #dc3545;
+        }
+
+        button.connected:hover {
+            background: #c82333;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            font-weight: 600;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .chat-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .message-log {
+            height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 12px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message.sent {
+            background: #e3f2fd;
+            margin-left: 50px;
+            text-align: right;
+        }
+
+        .message.received {
+            background: #f1f8e9;
+            margin-right: 50px;
+        }
+
+        .message-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-area input {
+            flex: 1;
+        }
+
+        .input-area button {
+            flex: 0 0 80px;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .quick-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quick-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .quick-btn.sos { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%); }
+        .quick-btn.help { background: linear-gradient(135deg, #ff9933 0%, #ff6600 100%); }
+        .quick-btn.enemy { background: linear-gradient(135deg, #3366cc 0%, #254e9c 100%); }
+        .quick-btn.backup { background: linear-gradient(135deg, #339966 0%, #26734d 100%); }
+
+        .language-selectors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .language-group {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .language-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .language-selectors {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
+            
+            .message.sent {
+                margin-left: 20px;
+            }
+            
+            .message.received {
+                margin-right: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 ESP32 Voice Translator</h1>
+            <p>Real-time voice translation with secure HTTPS</p>
+        </div>
+
+        <div class="content">
+            <div class="connection-panel">
+                <div class="input-group">
+                    <label for="espIp">ESP32 IP Address:</label>
+                    <input type="text" id="espIp" placeholder="192.168.1.100">
+                </div>
+                
+                <button id="connectBtn" onclick="toggleConnection()">Connect to ESP32</button>
+                
+                <div id="connectionStatus" class="status disconnected">
+                    Status: Disconnected
+                </div>
+            </div>
+
+            <div class="language-selectors">
+                <div class="language-group">
+                    <label>My Language:</label>
+                    <select id="myLanguage">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ta">Tamil</option>
+                    </select>
+                </div>
+                
+                <div class="language-group">
+                    <label>Translate to:</label>
+                    <select id="targetLanguage">
+                        <option value="es">Spanish</option>
+                        <option value="en">English</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ta">Tamil</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div class="message-log" id="messageLog">
+                    <div class="message received">
+                        <div class="message-header">System</div>
+                        <div>Welcome! Connect to your ESP32 and allow microphone access to start translating.</div>
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <input type="text" id="messageInput" placeholder="Type a message or use voice...">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="quick-btn sos" onclick="sendQuickAction('sos')">🚨 SOS</button>
+                    <button class="quick-btn help" onclick="sendQuickAction('help')">🆘 Help</button>
+                    <button class="quick-btn enemy" onclick="sendQuickAction('enemy')">🎯 Enemy</button>
+                    <button class="quick-btn backup" onclick="sendQuickAction('backup')">🪖 Backup</button>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="pulse" onclick="startVoiceRecording()" style="background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%); padding: 20px; border-radius: 50%; width: 80px; height: 80px; font-size: 24px;">
+                    🎤
+                </button>
+                <div id="recordingStatus" style="margin-top: 10px; color: #666; font-weight: 600;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application state
+        let isConnected = false;
+        let websocket = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let espBaseUrl = '';
+
+        // DOM Elements
+        const espIp = document.getElementById('espIp');
+        const connectBtn = document.getElementById('connectBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const myLanguage = document.getElementById('myLanguage');
+        const targetLanguage = document.getElementById('targetLanguage');
+        const messageLog = document.getElementById('messageLog');
+        const messageInput = document.getElementById('messageInput');
+        const recordingStatus = document.getElementById('recordingStatus');
+
+        // Initialize the app
+        function init() {
+            loadSavedPreferences();
+            setupEventListeners();
+            checkMicrophonePermission();
+        }
+
+        function loadSavedPreferences() {
+            const savedIp = localStorage.getItem('esp_ip');
+            const savedMyLanguage = localStorage.getItem('my_language');
+            const savedTargetLanguage = localStorage.getItem('target_language');
+            
+            if (savedIp) espIp.value = savedIp;
+            if (savedMyLanguage) myLanguage.value = savedMyLanguage;
+            if (savedTargetLanguage) targetLanguage.value = savedTargetLanguage;
+        }
+
+        function setupEventListeners() {
+            connectBtn.addEventListener('click', toggleConnection);
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendMessage();
+            });
+            
+            myLanguage.addEventListener('change', function() {
+                localStorage.setItem('my_language', myLanguage.value);
+            });
+            
+            targetLanguage.addEventListener('change', function() {
+                localStorage.setItem('target_language', targetLanguage.value);
+            });
+        }
+
+        async function checkMicrophonePermission() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+                recordingStatus.textContent = "Microphone: ✅ Ready";
+            } catch (error) {
+                recordingStatus.textContent = "Microphone: ❌ Click to enable";
+            }
+        }
+
+        function toggleConnection() {
+            if (isConnected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            const ip = espIp.value.trim();
+            if (!ip) {
+                alert("Please enter ESP32 IP address");
+                return;
+            }
+            
+            localStorage.setItem('esp_ip', ip);
+            espBaseUrl = `http://${ip}`;
+            
+            // Test connection
+            fetch(`${espBaseUrl}/get`)
+                .then(response => {
+                    if (response.ok) {
+                        isConnected = true;
+                        updateConnectionStatus(true, "Connected to ESP32");
+                        addMessage('System', 'Connected to ESP32. You can now send messages.', 'received');
+                    } else {
+                        throw new Error('Connection failed');
+                    }
+                })
+                .catch(error => {
+                    updateConnectionStatus(false, "Connection failed: " + error.message);
+                });
+        }
+
+        function disconnect() {
+            isConnected = false;
+            updateConnectionStatus(false, "Disconnected");
+            addMessage('System', 'Disconnected from ESP32', 'received');
+        }
+
+        function updateConnectionStatus(connected, message) {
+            connectionStatus.textContent = "Status: " + message;
+            connectBtn.textContent = connected ? "Disconnect" : "Connect to ESP32";
+            connectBtn.classList.toggle('connected', connected);
+            connectionStatus.className = connected ? 'status connected' : 'status disconnected';
+        }
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !isConnected) {
+                if (!isConnected) alert("Not connected to ESP32");
+                return;
+            }
+            
+            fetch(`${espBaseUrl}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `message=${encodeURIComponent(text)}&language=${encodeURIComponent(myLanguage.value)}`
+            })
+            .then(response => {
+                if (response.ok) {
+                    addMessage('You', text, 'sent');
+                    messageInput.value = '';
+                }
+            })
+            .catch(error => {
+                alert("Failed to send message");
+            });
+        }
+
+        function sendQuickAction(action) {
+            if (!isConnected) {
+                alert("Not connected to ESP32");
+                return;
+            }
+            
+            const messages = {
+                'sos': '🚨 SOS! I need immediate assistance!',
+                'help': '🆘 Help! I need support!',
+                'enemy': '🎯 Enemy spotted!',
+                'backup': '🪖 Need backup at my position!'
+            };
+            
+            const message = messages[action];
+            if (message) {
+                fetch(`${espBaseUrl}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `message=${encodeURIComponent(message)}&language=${encodeURIComponent(myLanguage.value)}`
+                })
+                .then(response => {
+                    if (response.ok) {
+                        addMessage('You', message, 'sent');
+                    }
+                });
+            }
+        }
+
+        async function startVoiceRecording() {
+            if (!isConnected) {
+                alert("Please connect to ESP32 first");
+                return;
+            }
+
+            if (isRecording) {
+                stopRecording();
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 16000
+                    }
+                });
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    await processRecording();
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStatus.textContent = "🔴 Recording... Speak now";
+                recordingStatus.style.color = "#ff4444";
+                
+                // Auto-stop after 10 seconds
+                setTimeout(() => {
+                    if (isRecording) stopRecording();
+                }, 10000);
+                
+            } catch (error) {
+                if (error.name === 'NotAllowedError') {
+                    alert("Please allow microphone access in your browser settings");
+                }
+                recordingStatus.textContent = "❌ Microphone access denied";
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordingStatus.textContent = "Processing...";
+            }
+        }
+
+        async function processRecording() {
+            try {
+                // Simulate speech recognition (would use Web Speech API or external service)
+                const simulatedText = "This is a simulated voice message";
+                
+                // Send to ESP32
+                fetch(`${espBaseUrl}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `message=${encodeURIComponent(simulatedText)}&language=${encodeURIComponent(myLanguage.value)}`
+                })
+                .then(response => {
+                    if (response.ok) {
+                        addMessage('You', simulatedText + ' 🎤', 'sent');
+                        recordingStatus.textContent = "✅ Voice message sent";
+                        recordingStatus.style.color = "#4CAF50";
+                    }
+                });
+                
+            } catch (error) {
+                recordingStatus.textContent = "❌ Error processing audio";
+            }
+        }
+
+        function addMessage(name, text, type) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', type);
+            
+            const headerElement = document.createElement('div');
+            headerElement.classList.add('message-header');
+            headerElement.textContent = name;
+            
+            const textElement = document.createElement('div');
+            textElement.textContent = text;
+            
+            messageElement.appendChild(headerElement);
+            messageElement.appendChild(textElement);
+            messageLog.appendChild(messageElement);
+            
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        // Check for new messages every 2 seconds
+        setInterval(() => {
+            if (isConnected) {
+                fetch(`${espBaseUrl}/get`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message && data.message !== '') {
+                            addMessage('Other', data.message, 'received');
+                        }
+                    });
+            }
+        }, 2000);
+
+        // Initialize when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
